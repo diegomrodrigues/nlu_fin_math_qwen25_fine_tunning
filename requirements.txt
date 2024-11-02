@@ -1,0 +1,11 @@
+datasets
+trl
+unsloth
+anthropic
+pint
+torch
+transformers
+pandas
+numpy
+sklearn
+tqdm
