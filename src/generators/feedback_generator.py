@@ -7,8 +7,38 @@ from ..config.models import MODELS
 from ..utils.timers import Timer
 
 FEEDBACK_PROMPT = """
-Your feedback prompt template here...
-"""  # (Use the FEEDBACK_PROMPT string from your main.py)
+Your task is to improve the AI's response and reasoning to match the reference answer given the question posed to it.
+
+<question>{{question}}</question>
+<reference_answer>{{answer}}</reference_answer>
+
+The AI's response was:
+
+<ai_reasoning>
+{{cot_response}}
+</ai_reasoning>
+
+<ai_answer>
+{{extracted_answer}}
+</ai_answer>
+
+The reference answer is:
+
+<reference_answer>
+{{answer}}
+</reference_answer>
+
+Your task:
+
+- Provide a corrected version of the AI's reasoning that fixes the mistakes it made to reach match the <reference_answer> based solo on the <question>. Make sure to include the final answer within \\boxed{}.
+- Ensure that the corrected_response is an improved version of the AI's response at <ai_reasoning> without rewriting it entirely. It should preserve most of the AI's reasoning only with minor adjustments to get to the correct answer from the wrong answer provided by the AI on <ai_answer>.
+
+Provide your corrected response, including the final answer within \\boxed{}, based on the <ai_response>, in the following format:
+
+<corrected_response>
+[Your corrected ai_reasoning with the final answer within \\boxed{} here]
+</corrected_response>
+"""
 
 class FeedbackGenerator:
     """Generates feedback using various AI models."""

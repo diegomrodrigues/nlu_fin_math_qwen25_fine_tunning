@@ -7,9 +7,63 @@ from ..config.models import MODELS
 from ..interfaces.anthropic_interface import AnthropicInterface
 from ..utils.timers import Timer
 
-PROMPT = """
-Your prompt template here...
-"""  # (Use the PROMPT string from your main.py)
+QUESTION_PROMPT = """
+You are an expert financial analyst tasked with creating comprehensive, self-contained questions based on complex financial reports. Your goal is to reformulate given information into a single question that includes all necessary context for answering without additional information.
+
+Here is the financial report you need to analyze:
+
+<pre_text>
+{{PRE_TEXT}}
+</pre_text>
+
+<table>
+{{TABLE}}
+</table>
+
+<post_text>
+{{POST_TEXT}}
+</post_text>
+
+For reference, here is the original question and its answer:
+
+<question>{{QUESTION}}</question>
+<answer>{{ANSWER}}</answer>
+
+And here is the key evidence used to answer the original question:
+
+<gold_evidence>{{GOLD_EVIDENCE}}</gold_evidence>
+
+Your task is to create a new, more comprehensive question that incorporates all the necessary information from the provided text, including the details from the gold evidence. Follow these steps:
+
+1. Carefully analyze the given text, extracting and listing key financial figures, percentages, dates, and any other relevant information.
+2. Identify the main topic or focus of the original question and summarize it.
+3. Compare the original question with the gold evidence to ensure all crucial information is captured.
+4. Extract all relevant information from the provided text that is necessary to answer the question.
+5. Incorporate this information into a new, single question that is self-contained and provides all the context needed to solve it.
+6. Ensure that the new question is clear, concise, and specific.
+7. Include all necessary numerical values, dates, or other details within the question itself.
+
+Guidelines for the new question:
+- It should be possible to answer the question using only the information provided within the question text.
+- Avoid references to external documents or additional context.
+- Use clear and precise language.
+- Make sure to create a single question, not a list of questions.
+- The question should provide all data necessary to answer it within its text.
+
+Before formulating your final question, wrap your analysis in <analysis> tags to break down the information and show your thought process. This will help ensure a thorough interpretation of the data.
+
+Format your output as follows:
+
+<analysis>
+[Your detailed analysis of the report, breaking down key facts and their relationships]
+</analysis>
+
+<new_question>
+[Your newly formulated, auto-explainable question with all necessary details from the analysis in order to answer the question]
+</new_question>
+
+Ensure that your new question is sufficiently detailed and self-contained so that it can be answered accurately without any additional context.
+"""
 
 class QuestionGenerator:
     """Generates questions using various AI models."""
@@ -32,7 +86,7 @@ class QuestionGenerator:
                 raise ValueError("Anthropic API key required for Claude models")
             self.model_interface = AnthropicInterface(anthropic_key, self.model_config)
 
-        self.prompt_template = PROMPT  # Your prompt template here
+        self.prompt_template = QUESTION_PROMPT
 
     def load_dataset(self, dataset_name: str = "dreamerdeo/finqa", split: str = "train") -> None:
         """Load and preprocess the dataset."""
