@@ -1,5 +1,5 @@
 import re
-import torch
+import torch # type: ignore
 from transformers import StoppingCriteria
 from transformers import StoppingCriteriaList
 

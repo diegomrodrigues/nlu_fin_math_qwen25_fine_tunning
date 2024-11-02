@@ -1,6 +1,6 @@
 from typing import Dict, Any, Optional
 import json
-from ..generators.question_generator import QuestionGenerator
+from generators.question_generator import QuestionGenerator
 
 def generate_questions_pipeline(
     model_name: str,

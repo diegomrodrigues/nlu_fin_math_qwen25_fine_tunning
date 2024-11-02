@@ -1,11 +1,11 @@
 import re
-import torch
-import torch.nn.functional as F
+import torch # type: ignore
+import torch.nn.functional as F # type: ignore
 from typing import List, Dict, Any, Tuple
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import logging
 import pandas as pd
-from ..utils.timers import Timer
+from utils.timers import Timer
 
 class AnswerComparator:
     """Compares AI-generated answers against correct answers."""

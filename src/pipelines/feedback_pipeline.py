@@ -1,6 +1,6 @@
 from typing import Dict, Any, Optional
 import pandas as pd
-from ..generators.feedback_generator import FeedbackGenerator
+from generators.feedback_generator import FeedbackGenerator
 
 def generate_feedback_pipeline(
     model_name: str,

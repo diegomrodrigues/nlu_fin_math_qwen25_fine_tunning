@@ -2,9 +2,9 @@ from typing import Dict, Any, Optional
 import re
 import pandas as pd
 from tqdm import tqdm
-from ..interfaces.anthropic_interface import AnthropicInterface
-from ..config.models import MODELS
-from ..utils.timers import Timer
+from interfaces.anthropic_interface import AnthropicInterface
+from config.models import MODELS
+from utils.timers import Timer
 
 FEEDBACK_PROMPT = """
 Your task is to improve the AI's response and reasoning to match the reference answer given the question posed to it.

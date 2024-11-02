@@ -1,12 +1,14 @@
 import time
 import re
 from typing import List, Dict, Any
-import anthropic
+import anthropic # type: ignore
 import pandas as pd
-from trl import DPOTrainer, DPOConfig
+from trl import DPOTrainer, DPOConfig # type: ignore
 from dataclasses import dataclass
-from ..config.models import ModelConfig, ModelProvider
-from ..utils.timers import Timer
+from config.models import ModelConfig, ModelProvider
+from utils.timers import Timer
+from anthropic.types.beta.message_create_params import MessageCreateParamsNonStreaming # type: ignore
+from anthropic.types.beta.messages.batch_create_params import Request # type: ignore
 
 @dataclass
 class AnthropicInterface:

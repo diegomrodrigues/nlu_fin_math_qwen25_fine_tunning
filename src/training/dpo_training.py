@@ -1,13 +1,14 @@
 from dataclasses import dataclass
-from typing import Tuple, List
+from typing import Tuple, List, Any
 import pandas as pd
 from transformers import AutoTokenizer
-from ..config.models import MODELS
-from ..handlers.model_handler import ModelHandler
-from ..utils.timers import Timer
-from ..utils.output_capture import OutputCapture
-from ..interfaces.anthropic_interface import AnthropicInterface
-from trl import DPOTrainer, DPOConfig
+from config.models import MODELS
+from handlers.model_handler import ModelHandler
+from utils.timers import Timer
+from utils.output_capture import OutputCapture
+from interfaces.anthropic_interface import AnthropicInterface
+from unsloth import FastLanguageModel # type: ignore
+from trl import DPOTrainer, DPOConfig # type: ignore
 from datasets import Dataset
 
 @dataclass
@@ -54,7 +55,7 @@ class DPOTrainingPipeline:
 
         return formatted_prompt
 
-    def prepare_model_and_tokenizer(self) -> Tuple[torch.nn.Module, Any, Any]:
+    def prepare_model_and_tokenizer(self) -> Tuple[torch.nn.Module, Any, Any]: # type: ignore
         """Initialize the model and tokenizer with optimizations."""
         print("Loading model and tokenizer...")
 
@@ -193,7 +194,7 @@ class DPOTrainingPipeline:
         max_seq_length: int = 2048,
         load_in_8bit: bool = False,
         load_in_4bit: bool = True
-    ) -> Tuple[torch.nn.Module, Any]:
+    ) -> Tuple[torch.nn.Module, Any]: # type: ignore
         """
         Load a fine-tuned model and tokenizer from a directory.
         """

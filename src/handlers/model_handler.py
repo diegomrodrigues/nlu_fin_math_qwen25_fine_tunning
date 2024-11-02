@@ -1,14 +1,14 @@
 from typing import List, Dict, Any, Optional
 import re
-import torch
+import torch # type: ignore
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
     StoppingCriteriaList
 )
-from ..utils.timers import Timer
-from ..utils.output_capture import OutputCapture
-from ..utils.stopping_criteria import CodeBlockStoppingCriteria
+from utils.timers import Timer
+from utils.output_capture import OutputCapture
+from utils.stopping_criteria import CodeBlockStoppingCriteria
 
 class ModelHandler:
     """Manages AI model operations."""

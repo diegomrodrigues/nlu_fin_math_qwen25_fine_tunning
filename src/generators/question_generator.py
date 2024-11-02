@@ -3,9 +3,9 @@ import re
 import pandas as pd
 from datasets import load_dataset
 from tqdm import tqdm
-from ..config.models import MODELS
-from ..interfaces.anthropic_interface import AnthropicInterface
-from ..utils.timers import Timer
+from config.models import MODELS
+from interfaces.anthropic_interface import AnthropicInterface
+from utils.timers import Timer
 
 QUESTION_PROMPT = """
 You are an expert financial analyst tasked with creating comprehensive, self-contained questions based on complex financial reports. Your goal is to reformulate given information into a single question that includes all necessary context for answering without additional information.
