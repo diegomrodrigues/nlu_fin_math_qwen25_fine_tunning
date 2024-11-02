@@ -1,6 +1,6 @@
 from typing import Dict, List, Optional, Union, Any, Tuple
 import pandas as pd
-import torch
+import torch # type: ignore
 from transformers import AutoTokenizer
 from training.dpo_training import DPOTrainingPipeline
 from handlers.model_handler import ModelHandler

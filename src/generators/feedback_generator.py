@@ -43,13 +43,15 @@ Provide your corrected response, including the final answer within \\boxed{}, ba
 class FeedbackGenerator:
     """Generates feedback using various AI models."""
 
-    def __init__(self, model_name: str, anthropic_key: str):
+    def __init__(self, model_name: str, anthropic_key: str, column_mapping: Optional[Dict[str, str]] = None):
         """
         Initialize the feedback generator with specified model and API key.
 
         Args:
             model_name (str): Name of the model to use.
             anthropic_key (str): Anthropic API key.
+            column_mapping (Dict[str, str], optional): Mapping of required fields to DataFrame column names.
+                                                     Defaults to using the standard column names.
         """
         self.model_config = MODELS.get(model_name)
         if not self.model_config:
@@ -60,6 +62,13 @@ class FeedbackGenerator:
 
         self.model_interface = AnthropicInterface(anthropic_key, self.model_config)
         self.prompt_template = FEEDBACK_PROMPT
+
+        self.column_mapping = column_mapping or {
+            "question": "question",
+            "answer": "answer",
+            "cot_response": "cot_response",
+            "extracted_answer": "extracted_answer"
+        }
 
     def generate_feedback(
         self,
@@ -89,15 +98,15 @@ class FeedbackGenerator:
             prompts = []
             for i, row in batch_df.iterrows():
                 prompt = self.prompt_template
-                for key in ["question", "answer", "cot_response", "extracted_answer"]:
-                    prompt = prompt.replace(f"{{{{{key}}}}}", str(row[key]))
+                for template_key, df_column in self.column_mapping.items():
+                    prompt = prompt.replace(f"{{{{{template_key}}}}}", str(row[df_column]))
 
                 prompts.append({
                     "id": str(row["id"]),
                     "PROMPT": prompt,
                     **{
-                        key.upper(): str(row[key])
-                        for key in ["question", "answer", "cot_response", "extracted_answer"]
+                        template_key.upper(): str(row[df_column])
+                        for template_key, df_column in self.column_mapping.items()
                     }
                 })
 

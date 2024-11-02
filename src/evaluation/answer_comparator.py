@@ -239,6 +239,8 @@ Is the student's final answer correct? Respond with either 'Correct' or 'Wrong'.
             DataFrame with added comparison metrics.
         """
         result_df = df.copy()
+        total_rows = len(result_df)
+        print(f"Starting to process {total_rows} rows...")
 
         result_df['model_evaluation'] = ''
         result_df['is_correct'] = False
@@ -247,6 +249,9 @@ Is the student's final answer correct? Respond with either 'Correct' or 'Wrong'.
 
         for idx, row in result_df.iterrows():
             try:
+                if idx % 10 == 0:  # Print progress every 10 rows
+                    print(f"Processing row {idx}/{total_rows} ({(idx/total_rows*100):.1f}%)")
+                
                 extracted_answer = self.extract_boxed_answer(row[response_col])
 
                 messages = self.build_messages(
@@ -269,9 +274,10 @@ Is the student's final answer correct? Respond with either 'Correct' or 'Wrong'.
                     result_df.at[idx, 'confidence_score'] = confidence
 
             except Exception as e:
-                self.logger.error(f"Error processing row {idx}: {str(e)}")
+                print(f"Error processing row {idx}: {str(e)}")
                 continue
 
+        print("Processing complete!")
         return result_df
 
     def calculate_metrics(self, df: pd.DataFrame) -> Dict[str, float]:

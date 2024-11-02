@@ -7,7 +7,8 @@ def generate_feedback_pipeline(
     anthropic_key: str,
     wrong_answers_df: pd.DataFrame,
     batch_size: int = 5,
-    output_file: Optional[str] = None
+    output_file: Optional[str] = None,
+    column_mapping: Optional[Dict[str, str]] = None
 ) -> Dict[str, Dict[str, str]]:
     """
     Pipeline to generate feedback for wrong answers using the FeedbackGenerator class.
@@ -18,6 +19,8 @@ def generate_feedback_pipeline(
         wrong_answers_df (pd.DataFrame): DataFrame containing wrong answers with required columns.
         batch_size (int): Number of samples to process in each batch.
         output_file (str, optional): Path to save the generated feedback as a CSV file.
+        column_mapping (Dict[str, str], optional): Mapping of required fields to DataFrame column names.
+                                                 Defaults to using the standard column names.
 
     Returns:
         Dict[str, Dict[str, str]]: Dictionary containing the generated feedback.
@@ -25,7 +28,8 @@ def generate_feedback_pipeline(
     # Initialize FeedbackGenerator
     feedback_gen = FeedbackGenerator(
         model_name=model_name,
-        anthropic_key=anthropic_key
+        anthropic_key=anthropic_key,
+        column_mapping=column_mapping
     )
     
     # Generate Feedback
