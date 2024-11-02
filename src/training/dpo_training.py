@@ -10,6 +10,7 @@ from interfaces.anthropic_interface import AnthropicInterface
 from unsloth import FastLanguageModel # type: ignore
 from trl import DPOTrainer, DPOConfig # type: ignore
 from datasets import Dataset
+import torch # type: ignore
 
 @dataclass
 class DPOTrainingPipeline:
@@ -237,7 +238,7 @@ class DPOTrainingPipeline:
             padding=True
         ).to(model.device)
 
-        with torch.no_grad():
+        with torch.no_grad(): # type: ignore
             outputs = model.generate(
                 **inputs,
                 max_new_tokens=max_new_tokens,
