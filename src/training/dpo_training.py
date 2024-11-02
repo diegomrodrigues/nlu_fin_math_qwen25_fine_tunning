@@ -11,6 +11,8 @@ from unsloth import FastLanguageModel # type: ignore
 from trl import DPOTrainer, DPOConfig # type: ignore
 from datasets import Dataset
 import torch # type: ignore
+from peft import AutoPeftModelForCausalLM # type: ignore
+import os
 
 @dataclass
 class DPOTrainingPipeline:
@@ -148,7 +150,7 @@ class DPOTrainingPipeline:
             output_dir=self.output_dir,
             num_train_epochs=self.num_train_epochs,
             per_device_train_batch_size=self.batch_size,
-            gradient_accumulation_steps=4,
+            gradient_accumulation_steps=2,
             learning_rate=self.learning_rate,
             beta=self.beta,
             max_length=self.max_seq_length,
@@ -158,7 +160,7 @@ class DPOTrainingPipeline:
             warmup_ratio=0.1,
             save_strategy="epoch",
             evaluation_strategy="no",
-            logging_steps=10,
+            logging_steps=5,
             optim="paged_adamw_32bit",
             fp16=True,
         )
@@ -195,19 +197,39 @@ class DPOTrainingPipeline:
         max_seq_length: int = 2048,
         load_in_8bit: bool = False,
         load_in_4bit: bool = True
-    ) -> Tuple[torch.nn.Module, Any]: # type: ignore
+    ) -> Tuple[torch.nn.Module, Any]:
         """
-        Load a fine-tuned model and tokenizer from a directory.
+        Load a fine-tuned model and tokenizer from a directory, handling both base and LoRA models.
         """
         print(f"Loading fine-tuned model from {model_path}")
-
+        
         try:
-            model, tokenizer = FastLanguageModel.from_pretrained(
-                model_name=model_path,
-                max_seq_length=max_seq_length,
-                load_in_8bit=load_in_8bit,
-                load_in_4bit=load_in_4bit
-            )
+            # Check if this is a LoRA adapter
+            if os.path.exists(os.path.join(model_path, "adapter_config.json")):
+                print("Detected LoRA adapter, loading with PEFT...")
+                # First load the base model
+                base_model_name = cls.original_model_name  # You might want to store this in adapter_config
+                model, tokenizer = FastLanguageModel.from_pretrained(
+                    model_name=base_model_name,
+                    load_in_8bit=load_in_8bit,
+                    load_in_4bit=load_in_4bit
+                )
+                
+                # Then load the LoRA adapter
+                model = AutoPeftModelForCausalLM.from_pretrained(
+                    model_path,
+                    device_map="auto" if device == "auto" else device,
+                    torch_dtype=torch.float16
+                )
+            else:
+                print("Loading as complete model...")
+                # Load as a complete model
+                model, tokenizer = FastLanguageModel.from_pretrained(
+                    model_name=model_path,
+                    load_in_8bit=load_in_8bit,
+                    load_in_4bit=load_in_4bit
+                )
+            
             print("Model and tokenizer loaded successfully")
             return model, tokenizer
 
@@ -234,14 +256,12 @@ class DPOTrainingPipeline:
             prompt,
             return_tensors="pt",
             truncation=True,
-            max_length=self.max_seq_length,
             padding=True
         ).to(model.device)
 
         with torch.no_grad(): # type: ignore
             outputs = model.generate(
                 **inputs,
-                max_new_tokens=max_new_tokens,
                 temperature=temperature,
                 top_p=top_p,
                 pad_token_id=tokenizer.pad_token_id,

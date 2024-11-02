@@ -1,3 +1,4 @@
 from .dpo_pipeline import train_dpo_pipeline
-from .question_pipeline import generate_questions_pipeline 
+from .question_pipeline import generate_questions_pipeline
 from .feedback_pipeline import generate_feedback_pipeline
+from .evaluation_pipeline import evaluate_answers_pipeline

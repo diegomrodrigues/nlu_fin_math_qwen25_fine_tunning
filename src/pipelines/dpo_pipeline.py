@@ -1,6 +1,6 @@
 from typing import Optional
 import pandas as pd
-from ..training.dpo_training import DPOTrainingPipeline
+from training.dpo_training import DPOTrainingPipeline
 
 def train_dpo_pipeline(
     model_name: str = "unsloth/Qwen2.5-Math-1.5B-bnb-4bit",

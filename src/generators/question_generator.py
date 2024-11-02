@@ -3,7 +3,7 @@ import re
 import pandas as pd
 from datasets import load_dataset
 from tqdm import tqdm
-from config.models import MODELS
+from config.models import MODELS, ModelProvider
 from interfaces.anthropic_interface import AnthropicInterface
 from utils.timers import Timer
 

@@ -1,11 +1,12 @@
 import re
 import torch # type: ignore
 import torch.nn.functional as F # type: ignore
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Tuple, Optional, Any
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import logging
 import pandas as pd
 from utils.timers import Timer
+from training import DPOTrainingPipeline
 
 class AnswerComparator:
     """Compares AI-generated answers against correct answers."""
@@ -17,20 +18,26 @@ class AnswerComparator:
         system_prompt: Optional[str] = None
     ):
         """
-        Initialize the AnswerComparator with Qwen model and configurations.
+        Initialize the AnswerComparator with either a base model or DPO-trained model.
 
         Args:
-            model_name: Name or path of the Qwen model.
+            model_name: Name or path of the model.
             device: Device to run the model on ("cuda" or "cpu").
             system_prompt: Custom system prompt. If None, uses default prompt.
+            pretrained_model: Optional tuple of (model, tokenizer) for DPO-trained models.
+            is_dpo_model: Whether the model is DPO-trained.
         """
         self.device = device
+
+        # Load judge teacher model
         self.model = AutoModelForCausalLM.from_pretrained(
             model_name,
             torch_dtype=torch.float16 if device == "cuda" else torch.float32,
-            device_map="auto"
+            device_map=self.device
         )
+
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+
 
         # Default system prompt if none provided
         self.system_prompt = system_prompt if system_prompt else (
@@ -100,12 +107,20 @@ Is the student's final answer correct? Respond with either 'Correct' or 'Wrong'.
                 add_generation_prompt=True
             )
 
-            model_inputs = self.tokenizer([text], return_tensors="pt").to(self.model.device)
+            # Tokenize without explicit max_length
+            model_inputs = self.tokenizer(
+                [text], 
+                return_tensors="pt",
+                padding=True,  # Added padding
+                truncation=True  # Added truncation                
+            ).to(self.model.device)
 
             generated_ids = self.model.generate(
                 **model_inputs,
-                max_new_tokens=32,  # Shorter for simple correct/incorrect responses
-                temperature=0,  # Deterministic output
+                max_new_tokens=32,
+                pad_token_id=self.tokenizer.pad_token_id,
+                eos_token_id=self.tokenizer.eos_token_id,
+                temperature=0,
                 do_sample=False
             )
 
@@ -140,12 +155,19 @@ Is the student's final answer correct? Respond with either 'Correct' or 'Wrong'.
                 add_generation_prompt=True
             )
 
-            model_inputs = self.tokenizer([text], return_tensors="pt").to(self.model.device)
+            model_inputs = self.tokenizer(
+                [text],
+                return_tensors="pt",
+                padding=True,
+                truncation=True
+            ).to(self.model.device)
 
             with torch.no_grad():
                 outputs = self.model.generate(
                     **model_inputs,
                     max_new_tokens=32,
+                    pad_token_id=self.tokenizer.pad_token_id,
+                    eos_token_id=self.tokenizer.eos_token_id,
                     temperature=0,
                     do_sample=False,
                     return_dict_in_generate=True,

@@ -87,13 +87,13 @@ class FeedbackGenerator:
             batch_df = wrong_answers_df.iloc[start_idx:end_idx]
 
             prompts = []
-            for _, row in batch_df.iterrows():
+            for i, row in batch_df.iterrows():
                 prompt = self.prompt_template
                 for key in ["question", "answer", "cot_response", "extracted_answer"]:
                     prompt = prompt.replace(f"{{{{{key}}}}}", str(row[key]))
 
                 prompts.append({
-                    "id": str(row.name),  # Using index as ID
+                    "id": str(row["id"]),
                     "PROMPT": prompt,
                     **{
                         key.upper(): str(row[key])
