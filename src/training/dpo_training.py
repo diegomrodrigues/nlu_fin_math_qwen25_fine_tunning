@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Tuple, List, Any
 import pandas as pd
 from transformers import AutoTokenizer
@@ -13,10 +13,13 @@ from datasets import Dataset
 import torch # type: ignore
 from peft import AutoPeftModelForCausalLM # type: ignore
 import os
+from huggingface_hub import HfApi
+import wandb # type: ignore
 
 @dataclass
 class DPOTrainingPipeline:
     """Pipeline for Direct Preference Optimization training with enhanced prompt formatting."""
+    project_name: str
     model_name: str = "unsloth/Qwen2.5-Math-1.5B-bnb-4bit"
     original_model_name: str = "Qwen/Qwen2.5-Math-1.5B-Instruct"
     max_seq_length: int = 2048
@@ -26,9 +29,21 @@ class DPOTrainingPipeline:
     num_train_epochs: int = 3
     learning_rate: float = 5e-5
     mode: str = "cot"
+    gradient_accumulation_steps: int = 2
+    warmup_ratio: float = 0.1
+    lora_r: int = 4
+    lora_alpha: int = 16
+    lora_dropout: float = 0
+    lora_target_modules: List[str] = field(default_factory=lambda: ["up_proj", "down_proj"])
+    use_gradient_checkpointing: bool = True
+    fp16: bool = True
+    optim: str = "paged_adamw_32bit"
+    save_strategy: str = "epoch"
+    random_state: int = 1337
 
     def __post_init__(self):
         print(f"Initializing DPO Training Pipeline with model: {self.model_name}")
+        print(f"Project name: {self.project_name}")
         print(f"Using reasoning mode: {self.mode}")
 
     def format_prompt_for_dpo(self, question: str, mode: str = "cot") -> str:
@@ -79,15 +94,13 @@ class DPOTrainingPipeline:
         # Add LoRA weights with optimized configuration
         model = FastLanguageModel.get_peft_model(
             model,
-            r=4,
-            target_modules=[
-                "up_proj", "down_proj"
-            ],
-            lora_alpha=16,
-            lora_dropout=0,
+            r=self.lora_r,
+            target_modules=self.lora_target_modules,
+            lora_alpha=self.lora_alpha,
+            lora_dropout=self.lora_dropout,
             bias="none",
-            use_gradient_checkpointing=True,
-            random_state=1337,
+            use_gradient_checkpointing=self.use_gradient_checkpointing,
+            random_state=self.random_state,
         )
 
         return model, fast_tokenizer, tokenizer
@@ -150,22 +163,44 @@ class DPOTrainingPipeline:
             output_dir=self.output_dir,
             num_train_epochs=self.num_train_epochs,
             per_device_train_batch_size=self.batch_size,
-            gradient_accumulation_steps=2,
+            gradient_accumulation_steps=self.gradient_accumulation_steps,
             learning_rate=self.learning_rate,
             beta=self.beta,
             max_length=self.max_seq_length,
-            gradient_checkpointing=True,
+            gradient_checkpointing=self.use_gradient_checkpointing,
             gradient_checkpointing_kwargs={"use_reentrant": False},
             lr_scheduler_type="cosine",
-            warmup_ratio=0.1,
-            save_strategy="epoch",
+            warmup_ratio=self.warmup_ratio,
+            save_strategy=self.save_strategy,
             evaluation_strategy="no",
             logging_steps=5,
-            optim="paged_adamw_32bit",
-            fp16=True,
+            optim=self.optim,
+            fp16=self.fp16,
+            report_to="wandb",
         )
 
         return training_args
+
+    def push_to_hub(self, model, tokenizer):
+        """Push the model and tokenizer to HuggingFace Hub"""
+        try:
+            api = HfApi()
+            repo_id = f"{api.whoami()['name']}/{self.project_name}"
+            
+            print(f"Pushing model and tokenizer to HuggingFace Hub: {repo_id}")
+            
+            # Create repo if it doesn't exist
+            api.create_repo(repo_id, exist_ok=True)
+            
+            # Push model and tokenizer
+            model.push_to_hub(repo_id)
+            tokenizer.push_to_hub(repo_id)
+            
+            print("Successfully pushed to HuggingFace Hub")
+            
+        except Exception as e:
+            print(f"Error pushing to HuggingFace Hub: {str(e)}")
+            raise
 
     def train(self, train_dataset: Dataset) -> None:
         """Execute the DPO training process."""
@@ -176,7 +211,7 @@ class DPOTrainingPipeline:
 
         trainer = DPOTrainer(
             model=model,
-            ref_model=None,  # No reference model needed
+            ref_model=None,
             args=training_args,
             train_dataset=train_dataset,
             tokenizer=tokenizer,
@@ -188,6 +223,12 @@ class DPOTrainingPipeline:
         print(f"Saving model to {self.output_dir}")
         trainer.save_model()
         tokenizer.save_pretrained(self.output_dir)
+
+        # Push to HuggingFace Hub
+        self.push_to_hub(model, tokenizer)
+
+        # Close wandb run
+        wandb.finish()
 
     @classmethod
     def load_from_pretrained(
