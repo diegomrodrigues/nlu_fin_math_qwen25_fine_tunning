@@ -22,6 +22,20 @@ class ModelHandler:
 
     def _setup_model_and_tokenizer(self):
         """Initialize model with optimizations."""
+        tokenizer = AutoTokenizer.from_pretrained(
+            self.model_name,
+            padding_side="left",
+            model_max_length=2048  # Set explicit max length
+        )
+        tokenizer.pad_token = tokenizer.eos_token  # Ensure padding token is set
+        # Get chat template from the model's tokenizer
+        if not tokenizer.chat_template:
+            base_model_tokenizer = AutoTokenizer.from_pretrained(
+                "Qwen/Qwen2.5-Math-1.5B-Instruct",
+                trust_remote_code=True
+            )
+            tokenizer.chat_template = base_model_tokenizer.chat_template
+
         model = AutoModelForCausalLM.from_pretrained(
             self.model_name,
             torch_dtype=torch.bfloat16,  # Use bfloat16 for faster inference
@@ -29,13 +43,6 @@ class ModelHandler:
             use_cache=True
         )
         model.config.use_cache = True
-
-        tokenizer = AutoTokenizer.from_pretrained(
-            self.model_name,
-            padding_side="left",
-            model_max_length=2048  # Set explicit max length
-        )
-        tokenizer.pad_token = tokenizer.eos_token  # Ensure padding token is set
 
         return model, tokenizer
 

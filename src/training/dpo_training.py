@@ -285,12 +285,13 @@ class DPOTrainingPipeline:
         question: str,
         mode: str = "cot",
         max_new_tokens: int = 512,
-        temperature: float = 0.7,
-        top_p: float = 0.9
     ) -> str:
         """
-        Generate a response using the loaded model.
+        Generate a deterministic response using the loaded model.
         """
+        # Set random seed for reproducibility
+        torch.manual_seed(self.random_state)
+        
         prompt = self.format_prompt_for_dpo(question, mode=mode)
 
         inputs = tokenizer(
@@ -300,15 +301,15 @@ class DPOTrainingPipeline:
             padding=True
         ).to(model.device)
 
-        with torch.no_grad(): # type: ignore
+        with torch.no_grad():
             outputs = model.generate(
                 **inputs,
-                temperature=temperature,
-                top_p=top_p,
+                max_new_tokens=max_new_tokens,
                 pad_token_id=tokenizer.pad_token_id,
                 eos_token_id=tokenizer.eos_token_id,
-                do_sample=True
+                do_sample=False,  # Use greedy decoding instead of sampling
+                num_beams=1  # Use simple greedy search
             )
 
         response = tokenizer.decode(outputs[0][inputs.input_ids.shape[1]:], skip_special_tokens=True)
-        return response.strip() 
+        return response.strip()
