@@ -40,21 +40,6 @@ class AnthropicInterface:
 
     def generate_batches(self, prompts: List[Dict[str, str]]) -> Dict[str, Dict[str, str]]:
         """Generates batches for processing multiple prompts."""
-        # If only one prompt, use single request mode
-        if len(prompts) == 1:
-            try:
-                response = self.generate_response(prompts[0]["PROMPT"])
-                return {
-                    f"batch-example-0": {
-                        **prompts[0],
-                        "MODEL_OUTPUT": response
-                    }
-                }
-            except Exception as e:
-                print(f"Error in single request processing: {str(e)}")
-                raise e
-
-        # Otherwise use batch mode
         try:
             custom2prompt = {
                 f"batch-example-{i}": prompt_data for i, prompt_data in enumerate(prompts)
@@ -126,6 +111,10 @@ class AnthropicInterface:
 
     def retrieve_batches_results(self):
         """Generator that yields results from completed batch requests."""
+        # If no batch IDs (single prompt case), we've already returned the result
+        if not self.batch_ids:
+            return
+        
         for batch_id in self.batch_ids:
             try:
                 if self._wait_for_batch_completion(batch_id):

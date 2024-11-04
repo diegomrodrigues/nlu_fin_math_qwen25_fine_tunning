@@ -94,6 +94,44 @@ class QuestionGenerator:
         self.dataset = load_dataset(dataset_name)
         self.train_dataset = self.dataset[split]
 
+    def _prepare_prompt_data(self, idx: int) -> Dict[str, str]:
+        """Prepare prompt data for a single index."""
+        prompt_data = {
+            "id": self.train_dataset[idx]["id"],
+            "PROMPT": self.prompt_template
+        }
+        for k, v in self.train_dataset[idx].items():
+            prompt_data["PROMPT"] = prompt_data["PROMPT"].replace(f"{{{{{k.upper()}}}}}", str(v))
+            prompt_data[k.upper()] = str(v)
+        return prompt_data
+
+    def _clean_extracted_text(self, text: str) -> str:
+        """Clean and format extracted text."""
+        if not text:
+            return ""
+        text = re.sub(r'\n\s*\n', '\n', text)
+        text = '\n'.join(line.strip() for line in text.split('\n'))
+        return text.strip()
+
+    def _process_model_output(self, model_output: str, prompt_data: Dict[str, str]) -> Dict[str, Any]:
+        """Process model output and extract analysis and question."""
+        analysis_match = re.search(r"<analysis>\s*(.*?)\s*</analysis>",
+                                 model_output, re.DOTALL | re.IGNORECASE)
+        question_match = re.search(r"<new_question>\s*(.*?)\s*</new_question>",
+                                 model_output, re.DOTALL | re.IGNORECASE)
+
+        analysis = self._clean_extracted_text(analysis_match.group(1)) if analysis_match else ""
+        question = self._clean_extracted_text(question_match.group(1)) if question_match else ""
+
+        if not analysis or not question:
+            print(f"Missing {'analysis' if not analysis else 'question'} for {prompt_data['id']}")
+
+        return {
+            "ANALYSIS": analysis,
+            "FMT_QUESTION": question,
+            **prompt_data
+        }
+
     def generate_questions(
         self,
         batch_size: Optional[int] = None,
@@ -120,59 +158,30 @@ class QuestionGenerator:
         for start_idx in tqdm(range(0, total_samples, batch_size)):
             end_idx = min(start_idx + batch_size, total_samples)
 
-            prompts = []
-            for i in range(start_idx, end_idx):
-                prompt = self.prompt_template
-                for k, v in self.train_dataset[i].items():
-                    prompt = prompt.replace(f"{{{{{k.upper()}}}}}", str(v))
-
-                prompts.append({
-                    "id": self.train_dataset[i]["id"],
-                    "PROMPT": prompt,
-                    **{
-                        field.upper(): str(self.train_dataset[i][field])
-                        for field in ["pre_text", "table", "post_text", "question", "gold_evidence", "answer"]
-                    }
-                })
-
             try:
-                custom2prompt = self.model_interface.generate_batches(prompts)
-
-                def clean_extracted_text(text: str) -> str:
-                    if not text:
-                        return ""
-                    text = re.sub(r'\n\s*\n', '\n', text)
-                    text = '\n'.join(line.strip() for line in text.split('\n'))
-                    return text.strip()
-
-                for response in self.model_interface.retrieve_batches_results():
-                    try:
-                        model_output = response["MODEL_OUTPUT"]
-                        prompt_data = custom2prompt[response["id"]]
-
-                        analysis_match = re.search(r"<analysis>\s*(.*?)\s*</analysis>",
-                                                 model_output, re.DOTALL | re.IGNORECASE)
-                        question_match = re.search(r"<new_question>\s*(.*?)\s*</new_question>",
-                                                 model_output, re.DOTALL | re.IGNORECASE)
-
-                        analysis = clean_extracted_text(analysis_match.group(1)) if analysis_match else ""
-                        question = clean_extracted_text(question_match.group(1)) if question_match else ""
-
-                        formatted_questions[prompt_data["id"]] = {
-                            "ANALYSIS": analysis,
-                            "FMT_QUESTION": question,
-                            **prompt_data
-                        }
-
-                        if not analysis or not question:
-                            print(f"Missing {'analysis' if not analysis else 'question'} for {response['id']}")
-
-                    except Exception as e:
-                        print(f"Error processing response {response['id']}: {str(e)}")
-                        continue
+                if batch_size == 1:
+                    # Single prompt processing
+                    prompt_data = self._prepare_prompt_data(start_idx)
+                    model_output = self.model_interface.generate_response(prompt_data["PROMPT"])
+                    formatted_questions[prompt_data["id"]] = self._process_model_output(model_output, prompt_data)
+                else:
+                    # Batch processing
+                    prompts = [self._prepare_prompt_data(i) for i in range(start_idx, end_idx)]
+                    custom2prompt = self.model_interface.generate_batches(prompts)
+                    
+                    for response in self.model_interface.retrieve_batches_results():
+                        try:
+                            prompt_data = custom2prompt[response["id"]]
+                            formatted_questions[prompt_data["id"]] = self._process_model_output(
+                                response["MODEL_OUTPUT"], 
+                                prompt_data
+                            )
+                        except Exception as e:
+                            print(f"Error processing response {response['id']}: {str(e)}")
+                            continue
 
             except Exception as e:
                 print(f"Error processing batch {start_idx}-{end_idx}: {str(e)}")
                 continue
 
-        return formatted_questions 
+        return formatted_questions
