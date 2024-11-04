@@ -22,8 +22,39 @@ class AnthropicInterface:
         self.client = anthropic.Anthropic(api_key=self.api_key)
         self.batch_ids = []
 
+    def generate_response(self, prompt: str) -> str:
+        """Generates a single response for a given prompt."""
+        try:
+            response = self.client.messages.create(
+                model=self.model_config.name,
+                max_tokens=self.model_config.max_tokens,
+                temperature=self.model_config.temperature,
+                messages=[
+                    {"role": "user", "content": prompt}
+                ]
+            )
+            return response.content[0].text
+        except Exception as e:
+            print(f"Error in single request processing: {str(e)}")
+            raise e
+
     def generate_batches(self, prompts: List[Dict[str, str]]) -> Dict[str, Dict[str, str]]:
-        """Generates batches for processing."""
+        """Generates batches for processing multiple prompts."""
+        # If only one prompt, use single request mode
+        if len(prompts) == 1:
+            try:
+                response = self.generate_response(prompts[0]["PROMPT"])
+                return {
+                    f"batch-example-0": {
+                        **prompts[0],
+                        "MODEL_OUTPUT": response
+                    }
+                }
+            except Exception as e:
+                print(f"Error in single request processing: {str(e)}")
+                raise e
+
+        # Otherwise use batch mode
         try:
             custom2prompt = {
                 f"batch-example-{i}": prompt_data for i, prompt_data in enumerate(prompts)
