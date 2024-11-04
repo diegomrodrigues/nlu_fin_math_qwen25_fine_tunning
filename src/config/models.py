@@ -25,7 +25,7 @@ MODELS = {
         temperature=0
     ),
     "claude-haiku": ModelConfig(
-        name="claude-3-haiku-20240307",
+        name="claude-3-5-haiku-20241022",
         provider=ModelProvider.ANTHROPIC,
         max_tokens=4096,
         temperature=0
