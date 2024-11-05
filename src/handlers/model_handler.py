@@ -256,3 +256,56 @@ class ModelHandler:
             all_best_responses.append(candidate_responses[best_idx])
         
         return all_best_responses
+
+    def generate(
+        self,
+        prompt: str,
+        max_new_tokens: int = 512,
+        temperature: float = 0.7,
+        top_p: float = 0.9,
+        **kwargs
+    ) -> str:
+        """Generate a response for a single prompt."""
+        messages = [
+            {"role": "system", "content": "Please reason step by step, and put your final answer within \\boxed{}."},
+            {"role": "user", "content": prompt}
+        ]
+        
+        text = self.tokenizer.apply_chat_template(
+            messages,
+            tokenize=False,
+            add_generation_prompt=True
+        )
+        
+        model_inputs = self.tokenizer(
+            [text],
+            return_tensors="pt",
+            padding=True,
+            truncation=True,
+            max_length=2048,
+            return_attention_mask=True
+        ).to(self.model.device)
+        
+        with torch.no_grad():
+            generated_ids = self.model.generate(
+                **model_inputs,
+                max_new_tokens=max_new_tokens,
+                stopping_criteria=self.stopping_criteria,
+                pad_token_id=self.tokenizer.pad_token_id,
+                do_sample=True,
+                temperature=temperature,
+                top_p=top_p,
+                **kwargs
+            )
+            
+            # Execute code if present and continue generation
+            generated_ids = self._execute_and_continue_generation(generated_ids)
+            
+            # Decode only the new tokens
+            response = self.tokenizer.decode(
+                generated_ids[0][len(model_inputs.input_ids[0]):],
+                skip_special_tokens=True,
+                clean_up_tokenization_spaces=False
+            )
+            
+        return response

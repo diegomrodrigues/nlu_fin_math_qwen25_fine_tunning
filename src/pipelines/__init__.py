@@ -3,3 +3,4 @@ from .question_pipeline import generate_questions_pipeline
 from .feedback_pipeline import generate_feedback_pipeline
 from .evaluation_pipeline import evaluate_model_pipeline
 from .execution_pipeline import execute_model_pipeline
+from .gsm8k_pipeline import evaluate_gsm8k_pipeline

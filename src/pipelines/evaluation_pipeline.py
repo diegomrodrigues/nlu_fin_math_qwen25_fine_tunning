@@ -4,7 +4,6 @@ from evaluation.answer_comparator import AnswerComparator
 from training.dpo_training import DPOTrainingPipeline
 from tqdm import tqdm
 from handlers.reward_model_handler import RewardModelHandler
-from handlers.model_handler import ModelHandler
 
 def evaluate_model_pipeline(
     df: pd.DataFrame,
@@ -87,17 +86,52 @@ def evaluate_model_pipeline(
         else:
             # Import and use base model execution
             from pipelines.execution_pipeline import execute_model_pipeline
-            temp_df = execute_model_pipeline(
-                df=df,
-                input_col=question_col,
-                model_path=model_path,
-                mode=mode,
-                batch_size=batch_size,
-                max_seq_length=max_seq_length,
-                device=device
-            )
-            responses = temp_df['model_response'].tolist()
             
+            if use_best_of_n:
+                reward_model = RewardModelHandler(device=device)
+                responses = []
+                
+                for i in tqdm(range(0, len(df), batch_size)):
+                    batch_df = df.iloc[i:i + batch_size]
+                    batch_questions = batch_df[question_col].tolist()
+                    
+                    # Generate multiple responses for each question
+                    all_responses = []
+                    for _ in range(n_samples):
+                        temp_df = execute_model_pipeline(
+                            df=batch_df,
+                            input_col=question_col,
+                            model_path=model_path,
+                            mode=mode,
+                            batch_size=batch_size,
+                            max_seq_length=max_seq_length,
+                            device=device
+                        )
+                        all_responses.append(temp_df['model_response'].tolist())
+                    
+                    # Transpose to group responses by question
+                    question_responses = list(zip(*all_responses))
+                    
+                    # Select best response for each question using reward model
+                    batch_best_responses = []
+                    for question_response_set in question_responses:
+                        scores = reward_model.score_responses(question_response_set)
+                        best_response = question_response_set[scores.argmax()]
+                        batch_best_responses.append(best_response)
+                    
+                    responses.extend(batch_best_responses)
+            else:
+                temp_df = execute_model_pipeline(
+                    df=df,
+                    input_col=question_col,
+                    model_path=model_path,
+                    mode=mode,
+                    batch_size=batch_size,
+                    max_seq_length=max_seq_length,
+                    device=device
+                )
+                responses = temp_df['model_response'].tolist()
+
         results_df['model_response'] = responses
         response_col = 'model_response'
 
