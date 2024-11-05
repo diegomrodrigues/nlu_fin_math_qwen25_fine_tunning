@@ -3,6 +3,8 @@ import pandas as pd
 from evaluation.answer_comparator import AnswerComparator
 from training.dpo_training import DPOTrainingPipeline
 from tqdm import tqdm
+from handlers.reward_model_handler import RewardModelHandler
+from handlers.model_handler import ModelHandler
 
 def evaluate_model_pipeline(
     df: pd.DataFrame,
@@ -16,7 +18,9 @@ def evaluate_model_pipeline(
     mode: str = "cot",
     system_prompt: Optional[str] = None,
     batch_size: int = 4,
-    is_dpo_model: bool = False
+    is_dpo_model: bool = False,
+    use_best_of_n: bool = False,
+    n_samples: int = 5
 ) -> Tuple[pd.DataFrame, Dict[str, float]]:
     """
     Pipeline to evaluate model responses using AnswerComparator.
@@ -35,6 +39,8 @@ def evaluate_model_pipeline(
         system_prompt: Optional custom system prompt
         batch_size: Batch size for processing
         is_dpo_model: Whether the model is DPO-trained
+        use_best_of_n: Whether to use best-of-n sampling
+        n_samples: Number of samples to generate for best-of-n sampling
 
     Returns:
         Tuple of (DataFrame with evaluation results, metrics dictionary)
@@ -62,26 +68,22 @@ def evaluate_model_pipeline(
                 batch_size=batch_size
             )
             
-            responses = []
-            for i in tqdm(range(0, len(df), batch_size)):
-                batch_df = df.iloc[i:i + batch_size]
-                batch_responses = []
+            if use_best_of_n:
+                reward_model = RewardModelHandler(device=device)
+                responses = []
                 
-                for _, row in batch_df.iterrows():
-                    try:
-                        response = dpo_pipeline.generate_response(
-                            model=model,
-                            tokenizer=tokenizer,
-                            question=str(row[question_col]),
-                            mode=mode
-                        )
-                        batch_responses.append(response)
-                    except Exception as e:
-                        print(f"Error generating response: {str(e)}")
-                        batch_responses.append("")
-                        
-                responses.extend(batch_responses)
-                
+                for i in tqdm(range(0, len(df), batch_size)):
+                    batch_df = df.iloc[i:i + batch_size]
+                    batch_questions = batch_df[question_col].tolist()
+                    
+                    batch_responses = dpo_pipeline.generate_with_best_of_n(
+                        questions=batch_questions,
+                        n_samples=n_samples,
+                        reward_model=reward_model
+                    )
+                    
+                    responses.extend(batch_responses)
+            
         else:
             # Import and use base model execution
             from pipelines.execution_pipeline import execute_model_pipeline

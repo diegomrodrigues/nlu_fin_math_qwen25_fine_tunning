@@ -9,6 +9,7 @@ from transformers import (
 from utils.timers import Timer
 from utils.output_capture import OutputCapture
 from utils.stopping_criteria import CodeBlockStoppingCriteria
+from src.handlers.reward_model_handler import RewardModelHandler
 
 class ModelHandler:
     """Manages AI model operations."""
@@ -193,3 +194,65 @@ class ModelHandler:
                 )
 
             return outputs 
+
+    def generate_with_best_of_n(
+        self,
+        questions: List[str],
+        n_samples: int = 5,
+        reward_model: Optional[RewardModelHandler] = None,
+        **generation_kwargs
+    ) -> List[str]:
+        """Generate responses using best-of-n sampling with reward model scoring."""
+        if reward_model is None:
+            reward_model = RewardModelHandler()
+            
+        all_best_responses = []
+        
+        for question in questions:
+            # Generate n samples for each question
+            candidate_responses = []
+            for _ in range(n_samples):
+                messages = [
+                    {"role": "system", "content": "Please reason step by step, and put your final answer within \\boxed{}."},
+                    {"role": "user", "content": question}
+                ]
+                
+                text = self.tokenizer.apply_chat_template(
+                    messages,
+                    tokenize=False,
+                    add_generation_prompt=True
+                )
+                
+                model_inputs = self.tokenizer(
+                    [text],
+                    return_tensors="pt",
+                    padding=True,
+                    truncation=True
+                ).to(self.model.device)
+                
+                # Generate with some randomness
+                outputs = self.model.generate(
+                    **model_inputs,
+                    do_sample=True,
+                    temperature=0.7,
+                    top_p=0.9,
+                    **generation_kwargs
+                )
+                
+                response = self.tokenizer.decode(
+                    outputs[0][len(model_inputs.input_ids[0]):],
+                    skip_special_tokens=True
+                )
+                candidate_responses.append(response)
+            
+            # Score candidates using reward model
+            scores = reward_model.score_responses(
+                questions=[question] * n_samples,
+                responses=candidate_responses
+            )
+            
+            # Select best response
+            best_idx = max(range(len(scores)), key=lambda i: scores[i])
+            all_best_responses.append(candidate_responses[best_idx])
+        
+        return all_best_responses
